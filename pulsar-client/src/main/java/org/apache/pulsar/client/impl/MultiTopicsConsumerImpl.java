@@ -269,6 +269,10 @@ public class MultiTopicsConsumerImpl<T> extends ConsumerBase<T> {
                 // recursion and stack overflow
                 internalPinnedExecutor.execute(() -> receiveMessageFromConsumer(consumer));
             }
+        }).exceptionally(ex -> {
+            log.error("Receive operation failed on consumer {} - Retrying later", consumer, ex);
+            internalPinnedExecutor.schedule(() -> receiveMessageFromConsumer(consumer), 10, TimeUnit.SECONDS);
+            return null;
         });
     }
 
@@ -891,7 +895,6 @@ public class MultiTopicsConsumerImpl<T> extends ConsumerBase<T> {
     }
 
     // subscribe one more given topic, but already know the numberPartitions
-    @VisibleForTesting
     CompletableFuture<Void> subscribeAsync(String topicName, int numberPartitions) {
         TopicName topicNameInstance = getTopicName(topicName);
         if (topicNameInstance == null) {
