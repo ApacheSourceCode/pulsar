@@ -83,6 +83,13 @@ public class ResourceGroupService {
         NotSupported
     }
 
+    // Types of RG-usage stats that UTs may ask for
+    protected enum ResourceGroupUsageStatsType {
+        Cumulative,   // Cumulative usage, since the RG was instantiated
+        LocalSinceLastReported,  // Incremental usage since last report to the transport-manager
+        ReportFromTransportMgr   // Last reported stats for this broker, as provided by transport-manager
+    }
+
     /**
      * Create RG.
      *
@@ -370,13 +377,20 @@ public class ResourceGroupService {
 
     // Visibility for testing.
     protected BytesAndMessagesCount getRGUsage(String rgName, ResourceGroupMonitoringClass monClass,
-                                               boolean getCumulative) throws PulsarAdminException {
+                                               ResourceGroupUsageStatsType statsType) throws PulsarAdminException {
         final ResourceGroup rg = this.getResourceGroupInternal(rgName);
         if (rg != null) {
-            if (getCumulative) {
-                return rg.getLocalUsageStatsCumulative(monClass);
+            switch (statsType) {
+                default:
+                    String errStr = "Unsupported statsType: " + statsType;
+                    throw new PulsarAdminException(errStr);
+                case Cumulative:
+                    return rg.getLocalUsageStatsCumulative(monClass);
+                case LocalSinceLastReported:
+                    return rg.getLocalUsageStats(monClass);
+                case ReportFromTransportMgr:
+                    return rg.getLocalUsageStatsFromBrokerReports(monClass);
             }
-            return rg.getLocalUsageStats(monClass);
         }
 
         BytesAndMessagesCount retCount = new BytesAndMessagesCount();
@@ -598,16 +612,16 @@ public class ResourceGroupService {
             for (ResourceGroupMonitoringClass monClass : ResourceGroupMonitoringClass.values()) {
                 try {
                     globalUsageStats = resourceGroup.getGlobalUsageStats(monClass);
-                    localUsageStats = resourceGroup.getLocalUsageStats(monClass);
+                    localUsageStats = resourceGroup.getLocalUsageStatsFromBrokerReports(monClass);
                     confCounts = resourceGroup.getConfLimits(monClass);
 
-                    long[] globUsageBytesArray = new long[String.valueOf(globalUsageStats.bytes).length()];
+                    long[] globUsageBytesArray = new long[] { globalUsageStats.bytes };
                     updatedQuota.bytes = this.quotaCalculator.computeLocalQuota(
                             confCounts.bytes,
                             localUsageStats.bytes,
                             globUsageBytesArray);
 
-                    long[] globUsageMessagesArray = new long[String.valueOf(globalUsageStats.messages).length()];
+                    long[] globUsageMessagesArray = new long[] {globalUsageStats.messages };
                     updatedQuota.messages = this.quotaCalculator.computeLocalQuota(
                             confCounts.messages,
                             localUsageStats.messages,
