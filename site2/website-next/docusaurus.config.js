@@ -58,10 +58,12 @@ const injectLinkParse = ([, prefix, , name, path]) => {
 };
 
 const injectLinkParseForEndpoint = ([, info]) => {
-  // console.log("inject link parse: ", info);
-  const [method, path, suffix] = info.split("|");
+  let [method, path, suffix] = info.split("|");
+  if (!suffix) {
+    suffix = path;
+  }
 
-  const restPath = path.split("/");
+  let restPath = path.split("/");
   const restApiVersion = restPath[2];
   const restApiType = restPath[3];
   let restBaseUrl = restApiUrl;
@@ -90,12 +92,12 @@ module.exports = {
   tagline:
     "Apache Pulsar is a cloud-native, distributed messaging and streaming platform originally created at Yahoo! and now a top-level Apache Software Foundation project",
   url: "https://pulsar.apache.com",
-  baseUrl: "/",
+  baseUrl: baseUrl,
   onBrokenLinks: "ignore",
   onBrokenMarkdownLinks: "ignore",
   favicon: "img/favicon.ico",
-  organizationName: "Apache",
-  projectName: "Pulsar",
+  organizationName: "apache",
+  projectName: "pulsar",
   themeConfig: {
     navbar: {
       title: "",
@@ -129,6 +131,14 @@ module.exports = {
               label: "2.7.3",
               to: "docs/2.7.3/",
             },
+            {
+              label: "2.7.2",
+              to: "docs/2.7.2/",
+            },
+            {
+              label: "2.2.0",
+              to: "docs/2.2.0/",
+            },
           ],
         },
       ],
@@ -160,14 +170,7 @@ module.exports = {
       // theme: lightCodeTheme,
       // darkTheme: darkCodeTheme,
       theme: require("prism-react-renderer/themes/dracula"),
-      additionalLanguages: [
-        "powershell",
-        "java",
-        "go",
-        "c",
-        "cpp",
-        "python",
-      ],
+      additionalLanguages: ["powershell", "java", "go", "c", "cpp", "python"],
     },
   },
   presets: [
