@@ -36,6 +36,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -708,6 +709,52 @@ public class ReplicatorTest extends ReplicatorTestBase {
         ProducerImpl<byte[]> producer = (ProducerImpl<byte[]>) field.get(replicator);
         assertNull(producer);
     }
+
+    @Test(priority = 5, timeOut = 30000)
+    public void testReplicatorProducerName() throws Exception {
+        log.info("--- Starting ReplicatorTest::testReplicatorProducerName ---");
+        final String topicName = BrokerTestUtil.newUniqueName("persistent://pulsar/ns/testReplicatorProducerName");
+        final TopicName dest = TopicName.get(topicName);
+
+        @Cleanup
+        MessageProducer producer1 = new MessageProducer(url1, dest);
+
+        Awaitility.await().untilAsserted(() -> {
+            assertTrue(pulsar2.getBrokerService().getTopicReference(topicName).isPresent());
+        });
+        Optional<Topic> topic = pulsar2.getBrokerService().getTopicReference(topicName);
+        assertTrue(topic.isPresent());
+        Set<String> remoteClusters = topic.get().getProducers().values().stream()
+                .map(org.apache.pulsar.broker.service.Producer::getRemoteCluster)
+                .collect(Collectors.toSet());
+        assertTrue(remoteClusters.contains("r1"));
+    }
+
+    @Test(priority = 5, timeOut = 30000)
+    public void testReplicatorProducerNameWithUserDefinedReplicatorPrefix() throws Exception {
+        log.info("--- Starting ReplicatorTest::testReplicatorProducerNameWithUserDefinedReplicatorPrefix ---");
+        final String topicName = BrokerTestUtil.newUniqueName(
+                "persistent://pulsar/ns/testReplicatorProducerNameWithUserDefinedReplicatorPrefix");
+        final TopicName dest = TopicName.get(topicName);
+
+        pulsar1.getConfiguration().setReplicatorPrefix("user-defined-prefix");
+        pulsar2.getConfiguration().setReplicatorPrefix("user-defined-prefix");
+        pulsar3.getConfiguration().setReplicatorPrefix("user-defined-prefix");
+
+        @Cleanup
+        MessageProducer producer1 = new MessageProducer(url1, dest);
+
+        Awaitility.await().untilAsserted(()->{
+            assertTrue(pulsar2.getBrokerService().getTopicReference(topicName).isPresent());
+        });
+        Optional<Topic> topic = pulsar2.getBrokerService().getTopicReference(topicName);
+        assertTrue(topic.isPresent());
+        Set<String> remoteClusters = topic.get().getProducers().values().stream()
+                .map(org.apache.pulsar.broker.service.Producer::getRemoteCluster)
+                .collect(Collectors.toSet());
+        assertTrue(remoteClusters.contains("r1"));
+    }
+
 
     /**
      * Issue #199
