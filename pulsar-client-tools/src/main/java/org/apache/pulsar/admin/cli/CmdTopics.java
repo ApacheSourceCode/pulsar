@@ -69,6 +69,7 @@ import org.apache.pulsar.common.policies.data.PersistencePolicies;
 import org.apache.pulsar.common.policies.data.PersistentTopicInternalStats;
 import org.apache.pulsar.common.policies.data.PublishRate;
 import org.apache.pulsar.common.policies.data.RetentionPolicies;
+import org.apache.pulsar.common.policies.data.SchemaCompatibilityStrategy;
 import org.apache.pulsar.common.policies.data.SubscribeRate;
 import org.apache.pulsar.common.util.DateFormatter;
 import org.apache.pulsar.common.util.RelativeTimeUtil;
@@ -240,6 +241,10 @@ public class CmdTopics extends CmdBase {
         jcommander.addCommand("get-replication-clusters", new GetReplicationClusters());
         jcommander.addCommand("set-replication-clusters", new SetReplicationClusters());
         jcommander.addCommand("remove-replication-clusters", new RemoveReplicationClusters());
+
+        jcommander.addCommand("remove-schema-compatibility-strategy", new RemoveSchemaCompatibilityStrategy());
+        jcommander.addCommand("set-schema-compatibility-strategy", new SetSchemaCompatibilityStrategy());
+        jcommander.addCommand("get-schema-compatibility-strategy", new GetSchemaCompatibilityStrategy());
 
         initDeprecatedCommands();
     }
@@ -503,10 +508,29 @@ public class CmdTopics extends CmdBase {
                 "--partitions" }, description = "Number of partitions for the topic", required = true)
         private int numPartitions;
 
+        @Parameter(names = {"--metadata", "-m"}, description = "key value pair properties(a=a,b=b,c=c)")
+        private java.util.List<String> metadata;
+
         @Override
         void run() throws Exception {
             String topic = validateTopicName(params);
-            getTopics().createPartitionedTopic(topic, numPartitions);
+            Map<String, String> map = new HashMap<>();
+            if (metadata != null) {
+                for (String property : metadata) {
+                    if (!property.contains("=")) {
+                        throw new ParameterException(String.format("Invalid key value pair '%s', "
+                                + "valid format like 'a=a,b=b,c=c'.", property));
+                    } else {
+                        String[] keyValue = property.split("=");
+                        if (keyValue.length != 2) {
+                            throw new ParameterException(String.format("Invalid key value pair '%s', "
+                                    + "valid format like 'a=a,b=b,c=c'.", property));
+                        }
+                        map.put(keyValue[0], keyValue[1]);
+                    }
+                }
+            }
+            getTopics().createPartitionedTopic(topic, numPartitions, map);
         }
     }
 
@@ -531,10 +555,29 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
+        @Parameter(names = {"--metadata", "-m"}, description = "key value pair properties(a=a,b=b,c=c)")
+        private java.util.List<String> metadata;
+
         @Override
         void run() throws Exception {
             String topic = validateTopicName(params);
-            getTopics().createNonPartitionedTopic(topic);
+            Map<String, String> map = new HashMap<>();
+            if (metadata != null) {
+                for (String property : metadata) {
+                    if (!property.contains("=")) {
+                        throw new ParameterException(String.format("Invalid key value pair '%s', "
+                                + "valid format like 'a=a,b=b,c=c'.", property));
+                    } else {
+                        String[] keyValue = property.split("=");
+                        if (keyValue.length != 2) {
+                            throw new ParameterException(String.format("Invalid key value pair '%s', "
+                                    + "valid format like 'a=a,b=b,c=c'.", property));
+                        }
+                        map.put(keyValue[0], keyValue[1]);
+                    }
+                }
+            }
+            getTopics().createNonPartitionedTopic(topic, map);
         }
     }
 
@@ -2762,6 +2805,50 @@ public class CmdTopics extends CmdBase {
             }
             print(getTopics().getBacklogSizeByMessageId(persistentTopic, messageId));
 
+        }
+    }
+
+    @Parameters(commandDescription = "Remove schema compatibility strategy on a topic")
+    private class RemoveSchemaCompatibilityStrategy extends CliCommand {
+        @Parameter(description = "persistent://tenant/namespace/topic", required = true)
+        private java.util.List<String> params;
+
+        @Override
+        void run() throws PulsarAdminException {
+            String persistentTopic = validatePersistentTopic(params);
+            getAdmin().topicPolicies().removeSchemaCompatibilityStrategy(persistentTopic);
+        }
+    }
+
+    @Parameters(commandDescription = "Set schema compatibility strategy on a topic")
+    private class SetSchemaCompatibilityStrategy extends CliCommand {
+        @Parameter(description = "persistent://tenant/namespace/topic", required = true)
+        private java.util.List<String> params;
+
+        @Parameter(names = {"--strategy", "-s"}, description = "Schema compatibility strategy: [UNDEFINED, "
+                + "ALWAYS_INCOMPATIBLE, ALWAYS_COMPATIBLE, BACKWARD, FORWARD, FULL, BACKWARD_TRANSITIVE, "
+                + "FORWARD_TRANSITIVE, FULL_TRANSITIVE]", required = true)
+        private SchemaCompatibilityStrategy strategy;
+
+        @Override
+        void run() throws PulsarAdminException {
+            String persistentTopic = validatePersistentTopic(params);
+            getAdmin().topicPolicies().setSchemaCompatibilityStrategy(persistentTopic, strategy);
+        }
+    }
+
+    @Parameters(commandDescription = "Get schema compatibility strategy on a topic")
+    private class GetSchemaCompatibilityStrategy extends CliCommand {
+        @Parameter(description = "persistent://tenant/namespace/topic", required = true)
+        private java.util.List<String> params;
+
+        @Parameter(names = {"-ap", "--applied"}, description = "Get the applied policy of the topic")
+        private boolean applied = false;
+
+        @Override
+        void run() throws PulsarAdminException {
+            String persistentTopic = validatePersistentTopic(params);
+            print(getAdmin().topicPolicies().getSchemaCompatibilityStrategy(persistentTopic, applied));
         }
     }
 }
