@@ -144,9 +144,17 @@ public class WorkerConfig implements Serializable, PulsarConfiguration {
     @FieldContext(
             category = CATEGORY_WORKER,
             required = false,
+            deprecated = true,
             doc = "Configuration store connection string (as a comma-separated list)"
     )
+    @Deprecated
     private String configurationStoreServers;
+    @FieldContext(
+            category = CATEGORY_WORKER,
+            required = false,
+            doc = "Configuration store connection string (as a comma-separated list)"
+    )
+    private String configurationMetadataStoreUrl;
     @FieldContext(
             category = CATEGORY_WORKER,
             doc = "ZooKeeper session timeout in milliseconds"
@@ -179,12 +187,12 @@ public class WorkerConfig implements Serializable, PulsarConfiguration {
     private Boolean validateConnectorConfig = false;
     @FieldContext(
         category = CATEGORY_FUNCTIONS,
-        doc = "The path to the location to locate builtin functions"
+        doc = "Should the builtin sources/sinks be uploaded for the externally managed runtimes?"
     )
     private Boolean uploadBuiltinSinksSources = true;
     @FieldContext(
             category = CATEGORY_FUNCTIONS,
-            doc = "Should the builtin sources/sinks be uploaded for the externally managed runtimes?"
+            doc = "The path to the location to locate builtin functions"
     )
     private String functionsDirectory = "./functions";
     @FieldContext(
@@ -630,6 +638,14 @@ public class WorkerConfig implements Serializable, PulsarConfiguration {
             return InetAddress.getLocalHost().getCanonicalHostName();
         } catch (UnknownHostException ex) {
             throw new IllegalStateException("Failed to resolve localhost name.", ex);
+        }
+    }
+
+    public String getConfigurationMetadataStoreUrl() {
+        if (StringUtils.isNotBlank(configurationMetadataStoreUrl)) {
+            return configurationMetadataStoreUrl;
+        } else  {
+            return configurationStoreServers;
         }
     }
 
