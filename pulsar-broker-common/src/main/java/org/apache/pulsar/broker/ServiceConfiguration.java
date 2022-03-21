@@ -599,6 +599,7 @@ public class ServiceConfiguration implements PulsarConfiguration {
     private Set<String> subscriptionTypesEnabled =
             Sets.newHashSet("Exclusive", "Shared", "Failover", "Key_Shared");
 
+    @Deprecated
     @FieldContext(
         category = CATEGORY_POLICIES,
         dynamic = true,
@@ -702,6 +703,14 @@ public class ServiceConfiguration implements PulsarConfiguration {
             + " of namespace policy. This is enabled by default."
     )
     private boolean isAllowAutoUpdateSchemaEnabled = true;
+
+    @FieldContext(
+            category = CATEGORY_SERVER,
+            doc = "Whether to enable the automatic shrink of pendingAcks map, "
+                    + "the default is false, which means it is not enabled. "
+                    + "When there are a large number of share or key share consumers in the cluster, "
+                    + "it can be enabled to reduce the memory consumption caused by pendingAcks.")
+    private boolean autoShrinkForConsumerPendingAcksMap = false;
 
     @FieldContext(
         category = CATEGORY_SERVER,
@@ -1669,16 +1678,19 @@ public class ServiceConfiguration implements PulsarConfiguration {
     private int managedLedgerMaxAckQuorum = 5;
     @FieldContext(
         category = CATEGORY_STORAGE_ML,
+        dynamic = true,
         doc = "Amount of memory to use for caching data payload in managed ledger. \n\nThis"
             + " memory is allocated from JVM direct memory and it's shared across all the topics"
             + " running in the same broker. By default, uses 1/5th of available direct memory")
     private int managedLedgerCacheSizeMB = Math.max(64,
             (int) (io.netty.util.internal.PlatformDependent.maxDirectMemory() / 5 / (1024 * 1024)));
+
     @FieldContext(category = CATEGORY_STORAGE_ML, doc = "Whether we should make a copy of the entry payloads when "
             + "inserting in cache")
     private boolean managedLedgerCacheCopyEntries = false;
     @FieldContext(
         category = CATEGORY_STORAGE_ML,
+        dynamic = true,
         doc = "Threshold to which bring down the cache level when eviction is triggered"
     )
     private double managedLedgerCacheEvictionWatermark = 0.9;
@@ -1686,6 +1698,7 @@ public class ServiceConfiguration implements PulsarConfiguration {
             doc = "Configure the cache eviction frequency for the managed ledger cache. Default is 100/s")
     private double managedLedgerCacheEvictionFrequency = 100.0;
     @FieldContext(category = CATEGORY_STORAGE_ML,
+            dynamic = true,
             doc = "All entries that have stayed in cache for more than the configured time, will be evicted")
     private long managedLedgerCacheEvictionTimeThresholdMillis = 1000;
     @FieldContext(category = CATEGORY_STORAGE_ML,
@@ -1723,11 +1736,6 @@ public class ServiceConfiguration implements PulsarConfiguration {
         doc = "The class of the managed ledger storage"
     )
     private String managedLedgerStorageClassName = "org.apache.pulsar.broker.ManagedLedgerClientFactory";
-    @FieldContext(
-        category = CATEGORY_STORAGE_ML,
-        doc = "Number of threads to be used for managed ledger tasks dispatching"
-    )
-    private int managedLedgerNumWorkerThreads = Runtime.getRuntime().availableProcessors();
     @FieldContext(
         category = CATEGORY_STORAGE_ML,
         doc = "Number of threads to be used for managed ledger scheduled tasks"
@@ -2080,7 +2088,7 @@ public class ServiceConfiguration implements PulsarConfiguration {
         doc = "Supported algorithms name for namespace bundle split"
     )
     private List<String> supportedNamespaceBundleSplitAlgorithms = Lists.newArrayList("range_equally_divide",
-            "topic_count_equally_divide");
+            "topic_count_equally_divide", "specified_positions_divide");
     @FieldContext(
         dynamic = true,
         category = CATEGORY_LOAD_BALANCER,

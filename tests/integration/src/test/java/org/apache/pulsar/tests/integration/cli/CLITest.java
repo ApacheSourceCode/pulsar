@@ -88,12 +88,12 @@ public class CLITest extends PulsarTestSuite {
         final String persistentTopicName = TopicName.get(
                 "persistent",
                 NamespaceName.get(namespace),
-                "get_topics_mode_" + UUID.randomUUID().toString()).toString();
+                "get_topics_mode_" + UUID.randomUUID()).toString();
 
         final String nonPersistentTopicName = TopicName.get(
                 "non-persistent",
                 NamespaceName.get(namespace),
-                "get_topics_mode_" + UUID.randomUUID().toString()).toString();
+                "get_topics_mode_" + UUID.randomUUID()).toString();
 
         Producer<byte[]> producer1 = client.newProducer()
                 .topic(persistentTopicName)
@@ -293,6 +293,16 @@ public class CLITest extends PulsarTestSuite {
             fail("Command should have exited with non-zero");
         } catch (ContainerExecException e) {
             assertEquals(e.getResult().getStderr(), "rack name is invalid, it should not be null, empty or '/'\n\n");
+        }
+
+        try {
+            container.execCmd(
+                    PulsarCluster.ADMIN_SCRIPT,
+                    "namespaces",
+                    "set-schema-autoupdate-strategy",
+                    namespace);
+        } catch (ContainerExecException e) {
+            assertEquals(e.getResult().getStderr(), "Either --compatibility or --disabled must be specified\n\n");
         }
     }
 
