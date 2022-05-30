@@ -438,13 +438,6 @@ public class PulsarService implements AutoCloseable, ShutdownService {
                                                     * getConfiguration()
                                                     .getBrokerShutdownTimeoutMs())));
 
-            // shutdown loadmanager before shutting down the broker
-            executorServicesShutdown.shutdown(loadManagerExecutor);
-            LoadManager loadManager = this.loadManager.get();
-            if (loadManager != null) {
-                loadManager.stop();
-            }
-
             List<CompletableFuture<Void>> asyncCloseFutures = new ArrayList<>();
             if (this.brokerService != null) {
                 CompletableFuture<Void> brokerCloseFuture = this.brokerService.closeAsync();
@@ -479,6 +472,9 @@ public class PulsarService implements AutoCloseable, ShutdownService {
                 this.leaderElectionService = null;
             }
 
+            // shutdown loadmanager before shutting down the broker
+            executorServicesShutdown.shutdown(loadManagerExecutor);
+
             if (adminClient != null) {
                 adminClient.close();
                 adminClient = null;
@@ -505,7 +501,10 @@ public class PulsarService implements AutoCloseable, ShutdownService {
             executorServicesShutdown.shutdown(orderedExecutor);
             executorServicesShutdown.shutdown(cacheExecutor);
 
-
+            LoadManager loadManager = this.loadManager.get();
+            if (loadManager != null) {
+                loadManager.stop();
+            }
 
             if (schemaRegistryService != null) {
                 schemaRegistryService.close();
@@ -650,6 +649,26 @@ public class PulsarService implements AutoCloseable, ShutdownService {
             if (config.isAuthorizationEnabled() && !config.isAuthenticationEnabled()) {
                 throw new IllegalStateException("Invalid broker configuration. Authentication must be enabled with "
                         + "authenticationEnabled=true when authorization is enabled with authorizationEnabled=true.");
+            }
+
+            if (config.getDefaultRetentionSizeInMB() > 0
+                    && config.getBacklogQuotaDefaultLimitBytes() > 0
+                    && config.getBacklogQuotaDefaultLimitBytes()
+                    >= (config.getDefaultRetentionSizeInMB() * 1024L * 1024L)) {
+                throw new IllegalArgumentException(String.format("The retention size must > the backlog quota limit "
+                                + "size, but the configured backlog quota limit bytes is %d, the retention size is %d",
+                        config.getBacklogQuotaDefaultLimitBytes(),
+                        config.getDefaultRetentionSizeInMB() * 1024L * 1024L));
+            }
+
+            if (config.getDefaultRetentionTimeInMinutes() > 0
+                    && config.getBacklogQuotaDefaultLimitSecond() > 0
+                    && config.getBacklogQuotaDefaultLimitSecond() >= config.getDefaultRetentionTimeInMinutes() * 60) {
+                throw new IllegalArgumentException(String.format("The retention time must > the backlog quota limit "
+                                + "time, but the configured backlog quota limit time duration is %d, "
+                                + "the retention time duration is %d",
+                        config.getBacklogQuotaDefaultLimitSecond(),
+                        config.getDefaultRetentionTimeInMinutes() * 60));
             }
 
             if (!config.getLoadBalancerOverrideBrokerNicSpeedGbps().isPresent()
@@ -1377,6 +1396,10 @@ public class PulsarService implements AutoCloseable, ShutdownService {
         if (this.client == null) {
             try {
                 ClientConfigurationData conf = new ClientConfigurationData();
+
+                // Disable memory limit for broker client
+                conf.setMemoryLimitBytes(0);
+
                 conf.setServiceUrl(this.getConfiguration().isTlsEnabled()
                                 ? this.brokerServiceUrlTls : this.brokerServiceUrl);
                 conf.setTlsAllowInsecureConnection(this.getConfiguration().isTlsAllowInsecureConnection());
@@ -1671,6 +1694,7 @@ public class PulsarService implements AutoCloseable, ShutdownService {
 
         // inherit super users
         workerConfig.setSuperUserRoles(brokerConfig.getSuperUserRoles());
+        workerConfig.setFunctionsWorkerEnablePackageManagement(brokerConfig.isFunctionsWorkerEnablePackageManagement());
 
         // inherit the nar package locations
         if (isBlank(workerConfig.getFunctionsWorkerServiceNarPackage())) {
